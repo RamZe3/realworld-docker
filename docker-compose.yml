@@ -1,0 +1,89 @@
+version: '3'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: realworld-docker-frontend
+    command: serve -s build -l 3000
+    restart: unless-stopped
+    networks:
+      - realworld-docker-networks
+
+  api:
+    build: ./api
+    container_name: realworld-docker-api
+    command: npm run start
+    restart: unless-stopped
+    environment:
+      - MONGO_URL=mongodb://api_db:27017/api
+      - AUTH_API_URL=http://auth:3002
+      - MAILER_API_URL=http://mailer:3003
+      - PORT=3001
+    depends_on:
+      - api_db
+    networks:
+      - realworld-docker-networks
+
+  auth:
+    build: ./auth
+    container_name: realworld-docker-auth
+    command: npm run start
+    restart: unless-stopped
+    environment:
+      - PORT=3002
+      - MONGO_URL=mongodb://auth_db:27017/auth
+    networks:
+      - realworld-docker-networks
+      
+    depends_on:
+      - auth_db
+
+  mailer:
+    build: ./mailer
+    container_name: realworld-docker-mailer
+    command: npm run start
+    restart: unless-stopped
+    environment:
+      - PORT=3003
+    networks:
+      - realworld-docker-networks
+  
+  api_db: 
+    container_name: realworld-docker-api_db
+    image: mongo:latest
+    volumes:
+      - mongodb_api:/data/db
+    networks:
+      - realworld-docker-networks
+
+  auth_db: 
+    container_name: realworld-docker-auth_db
+    image: mongo:latest
+    volumes:
+      - mongodb_auth:/data/db
+    networks:
+      - realworld-docker-networks
+
+  nginx:
+    image: nginx:1.27.0-alpine
+    container_name: realworld-docker-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf.prod:/etc/nginx/conf.d/nginx.conf
+    depends_on:
+      - frontend
+      - api
+      - auth
+    networks:
+      - realworld-docker-networks
+
+volumes:
+  mongodb_api:
+  mongodb_auth:
+
+networks:
+  realworld-docker-networks:
+    driver: bridge
